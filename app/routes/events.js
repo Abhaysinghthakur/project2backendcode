@@ -111,7 +111,7 @@ module.exports.setRouter = (app) => {
         }
     */
     
-    app.get(`${baseUrl}/allEvents`,meetingController.allEvents);
+    // app.get(`${baseUrl}/allEvents`,meetingController.allEvents);
 
     app.get(`${baseUrl}/get/:eventId`,auth.isAuthorized,meetingController.getParticularEvent);
     /**

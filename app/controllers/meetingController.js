@@ -197,12 +197,12 @@ eventController.getParticularEvent = (req, res) => {
 
 //all events
 //TODO Delete this method
-eventController.allEvents = (req, res) => {
-    EventModel.find()
-        .exec((err, result) => {
-            res.send(result)
-        });
-};
+// eventController.allEvents = (req, res) => {
+//     EventModel.find()
+//         .exec((err, result) => {
+//             res.send(result)
+//         });
+// };
 
 eventController.events = {};
 
