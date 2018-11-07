@@ -75,8 +75,8 @@ server.on('listening', onListening);
 
 
 //Socket Code
-const eventController = require('./app/controllers/meetingController');
-const socketServer = eventController.setServer(server);
+const socketlib = require('./app/libs/socketLib');
+const socketServer = socketlib.setServer(server);
 
 /**
  * Event listener for HTTP server "error" event.

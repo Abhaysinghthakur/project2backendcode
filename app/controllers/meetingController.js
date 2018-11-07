@@ -13,6 +13,7 @@ const socketio = require('socket.io');
 const events = require('events');
 const eventEmitter = new events.EventEmitter();
 const mailer = require('nodemailer');
+const socketLib = require('../libs/socketLib');
 
 //importing models
 const EventModel = mongoose.model('Event');
@@ -52,8 +53,8 @@ eventController.createEvent = (req, res) => {
                 let apiResponse = response.generate(true, 'Error while creating new event', 500, null);
                 res.send(apiResponse);
             } else {
-                console.log('here')
-                eventEmitter.emit('NewEvent', newEvent);
+                // eventEmitter.emit('NewEvent', newEvent);
+                socketLib.eventAlerts.newEvent(newEvent);
                 let apiResponse = response.generate(false, 'New event created', 200, result);
                 res.send(apiResponse);
             }
@@ -90,7 +91,8 @@ eventController.editEvent = (req, res) => {
                     let apiResponse = response.generate(true, 'Cannot find the event with the given event Id', 400, null);
                     res.send(apiResponse);
                 } else {
-                    eventEmitter.emit('EditEvent', result);
+                    // eventEmitter.emit('EditEvent', result);
+                    socketLib.eventAlerts.editEvent(result);
                     let apiResponse = response.generate(false, 'event updated', 200, result);
                     res.send(apiResponse);
                 }
@@ -121,7 +123,8 @@ eventController.deleteEvent = (req, res) => {
                 let apiResponse = response.generate(true, 'Specified event is not present in the DB', 400, null);
                 res.send(apiResponse);
             } else {
-                eventEmitter.emit('EventDeleted', result);
+                // eventEmitter.emit('EventDeleted', result);
+                socketLib.eventAlerts.deletedEvent(result);
                 let apiResponse = response.generate(false, 'Event Deleted', 200, result);
                 res.send(apiResponse);
             };
@@ -204,93 +207,93 @@ eventController.getParticularEvent = (req, res) => {
 //         });
 // };
 
-eventController.events = {};
+// eventController.events = {};
 
-eventController.setServer = (server) => {
-    let io = socketio.listen(server)
+// eventController.setServer = (server) => {
+//     let io = socketio.listen(server)
 
-    let myIo = io.of('/');
+//     let myIo = io.of('/');
 
-    myIo.on('connection', (socket) => {
-        console.log('connection Made')
+//     myIo.on('connection', (socket) => {
+//         console.log('connection Made')
 
-        eventEmitter.on('NewEvent', (data) => {
-            console.log('\x1b[34m%s\x1b[0m', data);
-            for (participant of data.participants) {
-                socket.emit(participant, { 'type': 'NewEvent', 'message': `${data.createdByName} have made a new event for you`, 'data': data });
-                console.log('\x1b[34m%s\x1b[0m', 'New Event Emitted', participant)
-                eventController.events[data.eventId] = {};
-                eventController.events[data.eventId][participant] = setTimeout(() => {
-                    socket.emit(participant, { 'type': 'EventAlert', 'message': `there is an event scheduled at ${data.start - 60000*330}`, 'data': data })
-                    sendMail({ 'userId': participant, 'text': 'Event is scheduled at ' + data.start, 'subject': 'Scheduled Event' });
-                    console.log('\x1b[34m%s\x1b[0m', 'TimeOut occured', participant)
-                }, data.start.getTime() - Date.now() - 330 * 60000 - 1000 * 60);
-                sendMail({ 'userId': participant, 'text': 'New Event created for you', 'subject': 'New Event' });
-            }
-        });
+//         eventEmitter.on('NewEvent', (data) => {
+//             console.log('\x1b[34m%s\x1b[0m', data);
+//             for (participant of data.participants) {
+//                 socket.emit(participant, { 'type': 'NewEvent', 'message': `${data.createdByName} have made a new event for you`, 'data': data });
+//                 console.log('\x1b[34m%s\x1b[0m', 'New Event Emitted', participant)
+//                 eventController.events[data.eventId] = {};
+//                 eventController.events[data.eventId][participant] = setTimeout(() => {
+//                     socket.emit(participant, { 'type': 'EventAlert', 'message': `there is an event scheduled at ${data.start - 60000 * 330}`, 'data': data })
+//                     sendMail({ 'userId': participant, 'text': 'Event is scheduled at ' + data.start, 'subject': 'Scheduled Event' });
+//                     console.log('\x1b[34m%s\x1b[0m', 'TimeOut occured', participant)
+//                 }, data.start.getTime() - Date.now() - 330 * 60000 - 1000 * 60);
+//                 sendMail({ 'userId': participant, 'text': 'New Event created for you', 'subject': 'New Event' });
+//             }
+//         });
 
-        eventEmitter.on('EditEvent', (data) => {
-            console.log('\x1b[33m%s\x1b[0m', data);
-            for ( participant of data.participants) {
-                socket.emit(participant, { 'type': 'EditEvent', 'message': `${data.createdByName} has edit an event that you are part of`, 'data': data });
-                sendMail({ 'userId': participant, 'text': 'Event Edited which you are a part of', 'subject': 'Event Edited' });
-                console.log('\x1b[33m%s\x1b[0m', 'edit Event Emitted', participant)
-            }
-        });
+//         eventEmitter.on('EditEvent', (data) => {
+//             console.log('\x1b[33m%s\x1b[0m', data);
+//             for (participant of data.participants) {
+//                 socket.emit(participant, { 'type': 'EditEvent', 'message': `${data.createdByName} has edit an event that you are part of`, 'data': data });
+//                 sendMail({ 'userId': participant, 'text': 'Event Edited which you are a part of', 'subject': 'Event Edited' });
+//                 console.log('\x1b[33m%s\x1b[0m', 'edit Event Emitted', participant)
+//             }
+//         });
 
-        eventEmitter.on('EventDeleted', (data) => {
-            console.log('\x1b[32m%s\x1b[0m', data);
-            if (eventController.events[data.eventId]) {
-                for ( participant of data.participants) {
-                    socket.emit(participant, { 'type': 'DeleteEvent', 'message': `${data.createdByName} has deleted an event that you are part of`, 'data': data });
-                    clearTimeout(eventController.events[data.eventId][participant]);
-                    sendMail({ 'userId': participant, 'text': 'Event deleted which you are a part of', 'subject': 'Event Deleted' });
-                    console.log('\x1b[32m%s\x1b[0m', 'delete Event Emitted', participant)
-                }
-            }
-        });
+//         eventEmitter.on('EventDeleted', (data) => {
+//             console.log('\x1b[32m%s\x1b[0m', data);
+//             if (eventController.events[data.eventId]) {
+//                 for (participant of data.participants) {
+//                     socket.emit(participant, { 'type': 'DeleteEvent', 'message': `${data.createdByName} has deleted an event that you are part of`, 'data': data });
+//                     clearTimeout(eventController.events[data.eventId][participant]);
+//                     sendMail({ 'userId': participant, 'text': 'Event deleted which you are a part of', 'subject': 'Event Deleted' });
+//                     console.log('\x1b[32m%s\x1b[0m', 'delete Event Emitted', participant)
+//                 }
+//             }
+//         });
 
-    });
+//     });
 
-}
+// }
 
-let transporter = mailer.createTransport({
-    service: 'gmail',
-    secure: false,
-    host: 'http//:localhost',
-    port: 3000,
-    auth: {
-        user: 'dummymailerforproject@gmail.com',
-        pass: 'something123@'
-    }
-});
+// let transporter = mailer.createTransport({
+//     service: 'gmail',
+//     secure: false,
+//     host: 'http//:localhost',
+//     port: 3000,
+//     auth: {
+//         user: 'dummymailerforproject@gmail.com',
+//         pass: 'something123@'
+//     }
+// });
 
-let sendMail = (data) => {
-    UserModel.findOne({ 'userId': data.userId })
-        .exec((err, result) => {
-            if (err) {
-                logger.error('Error while finding user', 'SocketLib:sendMail', 10);
-            } else if (check.isEmpty(result)) {
-                logger.error('404 Cannot find user in DB', 'SocketLib:sendMail', 10)
-            } else {
+// let sendMail = (data) => {
+//     UserModel.findOne({ 'userId': data.userId })
+//         .exec((err, result) => {
+//             if (err) {
+//                 logger.error('Error while finding user', 'SocketLib:sendMail', 10);
+//             } else if (check.isEmpty(result)) {
+//                 logger.error('404 Cannot find user in DB', 'SocketLib:sendMail', 10)
+//             } else {
 
-                let mailOptions = {
-                    from: 'dummymailerforproject@gmail.com',
-                    to: result.email,
-                    subject: data.subject,
-                    text: data.text,
-                };
+//                 let mailOptions = {
+//                     from: 'dummymailerforproject@gmail.com',
+//                     to: result.email,
+//                     subject: data.subject,
+//                     text: data.text,
+//                 };
 
-                transporter.sendMail(mailOptions, (err, info) => {
-                    if (err) {
-                        logger.error(err, 'SocketLib:sendMail', 5)
-                    } else {
-                        logger.info(info, 'SocketLib:sendMail', 0)
-                    }
-                })
-            }
-        });
-}
+//                 transporter.sendMail(mailOptions, (err, info) => {
+//                     if (err) {
+//                         logger.error(err, 'SocketLib:sendMail', 5)
+//                     } else {
+//                         logger.info(info, 'SocketLib:sendMail', 0)
+//                     }
+//                 })
+//             }
+//         });
+// }
 
 
 //exporting the module
